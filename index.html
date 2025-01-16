@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin- und Gutscheinverwaltung</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .item {
+            padding: 10px;
+            margin: 10px 0;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .item button {
+            margin-top: 10px;
+            width: auto;
+            padding: 5px 10px;
+        }
+        .delete {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .edit {
+            background-color: #f39c12;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Gutscheinverwaltung</h1>
+</header>
+
+<div id="login-container" class="container">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Benutzername">
+    <input type="password" id="password" placeholder="Passwort">
+    <button onclick="login()">Einloggen</button>
+    <p id="error-message" style="color: red; display: none;">Benutzername oder Passwort ist falsch!</p>
+</div>
+
+<div id="admin-container" class="container" style="display: none;">
+    <h2>Admin-Panel</h2>
+    <h3>Gutschein hinzufügen</h3>
+    <input type="text" id="gutschein-title" placeholder="Gutscheinname">
+    <input type="text" id="gutschein-desc" placeholder="Beschreibung">
+    <button onclick="addGutschein()">Gutschein hinzufügen</button>
+
+    <h3>Alle Gutscheine</h3>
+    <div id="gutschein-list"></div>
+
+    <h3>Neuen Benutzer hinzufügen</h3>
+    <input type="text" id="new-username" placeholder="Benutzername">
+    <input type="password" id="new-password" placeholder="Passwort">
+    <button onclick="addUser()">Benutzer hinzufügen</button>
+
+    <h3>Benutzerliste</h3>
+    <div id="user-list"></div>
+    <button onclick="logout()">Ausloggen</button>
+</div>
+
+<div id="user-container" class="container" style="display: none;">
+    <h2>Verfügbare Gutscheine</h2>
+    <div id="user-gutschein-list"></div>
+    <button onclick="logout()">Ausloggen</button>
+</div>
+
+<script>
+    let users = JSON.parse(localStorage.getItem("users")) || [
+        { username: "admin", password: "admin123", role: "admin" },
+        { username: "user1", password: "pass123", role: "user" },
+        { username: "Brutzi10", password: "brutzi10jahre", role: "user"},
+        { username: "Brutzineu",password: "theoneuzugang", role: "user"},
+        { username: "admintheo",password: "admintheo",role: "admin"},
+    ];
+
+    let gutscheine = JSON.parse(localStorage.getItem("gutscheine")) || [
+        { title: "Minecraft Gutschein", description: " 4 Stunde Minecraft spielen immer 1h", redeemed: false },
+        { title: "Entspannungs-Gutschein", description: "2h Entspannung", redeemed: false },
+        { title: "Relaxing", description: "einfach mal 2h massage", redeemed: false },
+        {title: " Lieb haben Tag", description: "lieb haben mauuuu", redeemed: false },
+        {title: "clean", description: "Emil hielft dir dein zimmer aufräumen", redeemed: false},
+        {title: "zocken", description: "wir zocken ein spiel deiner wahl bis wir kein bock mehr haben",redeemed: false}
+        
+
+    ];
+
+    let currentUser = null;
+
+    function saveToLocalStorage() {
+        localStorage.setItem("users", JSON.stringify(users));
+        localStorage.setItem("gutscheine", JSON.stringify(gutscheine));
+    }
+
+    function login() {
+        const username = document.getElementById("username").value;
+        const password = document.getElementById("password").value;
+        const user = users.find(u => u.username === username && u.password === password);
+
+        if (user) {
+            currentUser = user;
+            document.getElementById("login-container").style.display = "none";
+            if (user.role === "admin") {
+                document.getElementById("admin-container").style.display = "block";
+                showGutscheine();
+                showUsers();
+            } else {
+                document.getElementById("user-container").style.display = "block";
+                showUserGutscheine();
+            }
+        } else {
+            document.getElementById("error-message").style.display = "block";
+        }
+    }
+
+    function showGutscheine() {
+        const gutscheinList = document.getElementById("gutschein-list");
+        gutscheinList.innerHTML = "";
+        gutscheine.forEach((gutschein, index) => {
+            const div = document.createElement("div");
+            div.className = "item";
+            div.innerHTML = `
+                <h3>${gutschein.title}</h3>
+                <p>${gutschein.description}</p>
+                <button class="edit" onclick="editGutschein(${index})">Bearbeiten</button>
+                <button class="delete" onclick="deleteGutschein(${index})">Löschen</button>
+            `;
+            gutscheinList.appendChild(div);
+        });
+    }
+
+    function editGutschein(index) {
+        const newTitle = prompt("Neuer Gutscheinname:", gutscheine[index].title);
+        const newDescription = prompt("Neue Beschreibung:", gutscheine[index].description);
+
+        if (newTitle && newDescription) {
+            gutscheine[index].title = newTitle;
+            gutscheine[index].description = newDescription;
+            saveToLocalStorage();
+            alert("Gutschein erfolgreich bearbeitet!");
+            showGutscheine();
+        } else {
+            alert("Bearbeitung abgebrochen!");
+        }
+    }
+
+    function addGutschein() {
+        const title = document.getElementById("gutschein-title").value;
+        const desc = document.getElementById("gutschein-desc").value;
+        if (title && desc) {
+            gutscheine.push({ title, description: desc, redeemed: false });
+            saveToLocalStorage();
+            alert("Gutschein hinzugefügt!");
+            showGutscheine();
+        } else {
+            alert("Bitte alle Felder ausfüllen.");
+        }
+    }
+
+    function deleteGutschein(index) {
+        gutscheine.splice(index, 1);
+        saveToLocalStorage();
+        alert("Gutschein gelöscht!");
+        showGutscheine();
+    }
+
+    function showUserGutscheine() {
+        const userGutscheinList = document.getElementById("user-gutschein-list");
+        userGutscheinList.innerHTML = "";
+        gutscheine.forEach((gutschein, index) => {
+            if (!gutschein.redeemed) {
+                const div = document.createElement("div");
+                div.className = "item";
+                div.innerHTML = `
+                    <h3>${gutschein.title}</h3>
+                    <p>${gutschein.description}</p>
+                    <button onclick="redeemGutschein(${index})">Einlösen</button>
+                `;
+                userGutscheinList.appendChild(div);
+            }
+        });
+    }
+
+    function redeemGutschein(index) {
+        gutscheine[index].redeemed = true;
+        saveToLocalStorage();
+        alert(`Gutschein "${gutscheine[index].title}" eingelöst!`);
+        showUserGutscheine();
+    }
+
+    function addUser() {
+        const username = document.getElementById("new-username").value;
+        const password = document.getElementById("new-password").value;
+        if (username && password) {
+            users.push({ username, password, role: "user" });
+            saveToLocalStorage();
+            alert("Benutzer hinzugefügt!");
+            showUsers();
+        } else {
+            alert("Bitte alle Felder ausfüllen.");
+        }
+    }
+
+    function showUsers() {
+        const userList = document.getElementById("user-list");
+        userList.innerHTML = "";
+        users.forEach((user, index) => {
+            if (user.role !== "admin") {
+                const div = document.createElement("div");
+                div.className = "item";
+                div.innerHTML = `
+                    <h3>${user.username}</h3>
+                    <button class="delete" onclick="deleteUser(${index})">Löschen</button>
+                `;
+                userList.appendChild(div);
+            }
+        });
+    }
+
+    function deleteUser(index) {
+        users.splice(index, 1);
+        saveToLocalStorage();
+        alert("Benutzer gelöscht!");
+        showUsers();
+    }
+
+    function logout() {
+        currentUser = null;
+        document.getElementById
+
+("login-container").style.display = "block";
+        document.getElementById("admin-container").style.display = "none";
+        document.getElementById("user-container").style.display = "none";
+    }
+</script>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Textfeld Beispiel</title>
+    <style>
+        /* Stil für das Textfeld */
+        #textfeld {
+            background: linear-gradient(145deg, #ffe2c4, #ffcc99); /* Weicher, warmer Verlauf */
+            color: #ff5733; /* Elegantes Rot für den Text */
+            font-size: 18px; /* Größere Schriftgröße */
+            padding: 20px; /* Innenabstand */
+            border: 3px solid #ff5733; /* Eleganter Rand in Rot */
+            width: auto; /* Auto-Größe je nach Inhalt */
+            max-width: 90%; /* Maximale Breite für große Bildschirme */
+            margin: 20px auto; /* Zentrieren und Abstand oben und unten */
+            border-radius: 20px; /* Abgerundete Ecken */
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15); /* Stärkerer Schatten für einen "schwebenden" Effekt */
+            text-align: center; /* Text zentriert */
+            transition: transform 0.3s ease, box-shadow 0.3s ease; /* Übergang für sanfte Animation */
+        }
+
+        /* Stil für das Textfeld beim Hover oder Fokus */
+        #textfeld:hover, #textfeld:focus {
+            transform: scale(1.05); /* Textfeld wird leicht vergrößert */
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2); /* Stärkerer Schatten bei Hover */
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Das Textfeld mit dem festen Text -->
+    <div id="textfeld" contenteditable="true">
+        Mauuu Theo, alles alles Gute zu deinem 10. Geburtstag! Ich hoffe, dir gefällt mein Geschenk. Ich habe soooo viel Arbeit reingesteckt. Hab dich lieb, Brudi! ♥ ❤ ❥ ❣ ❦ ❧❤️❤️❤️💗💗❤️❤️
+    </div>
+
+</body>
+</html>
+</body>
+</html>
